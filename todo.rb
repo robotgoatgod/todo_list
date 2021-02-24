@@ -2,12 +2,48 @@
 
 require 'sinatra'
 require 'sinatra/content_for'
-require 'sinatra/reloader'
+require 'sinatra/reloader' if development?
 require 'tilt/erubis'
 
 configure do
   enable :sessions
   set :session_secret, 'secret'
+end
+
+helpers do
+  def list_complete?(list)
+    !list_new?(list) && todos_remaining(list) == 0
+  end
+
+  def list_new?(list)
+    list[:todos].empty?
+  end
+
+  def todos_remaining(list)
+    list[:todos].count { |todo| todo[:completed] == false }
+  end
+
+  def list_class(list)
+    if list_complete?(list)
+      "complete"
+    elsif list_new?(list)
+      "new"
+    end
+  end
+
+  def sort_lists(lists, &block)
+    complete, incomplete = lists.partition { |list| list_complete?(list) }
+
+    incomplete.each { |list| yield list, lists.index(list) }
+    complete.each { |list| yield list, lists.index(last)}
+  end
+
+  def sort_todos(todos, &block)
+    complete, incomplete = todos.partition { |todo| todo[:completed] }
+
+    incomplete.each { |todo| yield todo, todos.index(todo) }
+    complete.each { |todo| yield todo, todos.index(todo) }
+  end
 end
 
 before do
@@ -143,4 +179,15 @@ post "/lists/:list_id/complete_all" do
   @list[:todos].each { |todo| todo[:completed] = true }
   session[:success] = "All todos have been completed!"
   redirect "/lists/#{@list_id}"
+end
+
+helpers do
+  def list_complete?(list)
+    list[:todos].all? { |todo| todo[:completed] == true } &&
+    list[:todos].size >= 1
+  end
+
+  def count_completed_todos(list)
+    list[:todos].count { |todo| todo[:completed] == true }
+  end
 end
